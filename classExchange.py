@@ -10,42 +10,48 @@ import socket
 from threading import Thread
 import requests
 
+
 class Exchange:
-    jsonBuy, jsonSell, loadingBook = [], [], []
-    dealDetails = {}
-    dealDetailsOld = {}
-    cancelDetails = {}
-
+    
+    # After selling or buying info about the trade
+    deal_details = {}
+    
+    # Info about the last trade before the current
+    deal_details_old = {}
+    
+    # Info about a canceled order
+    cancel_details = {}
+    
+    # Trade fee
     fee = 0
-    startEth = 0
-    startBtc = 0
-
+    
+    # API Request string for an exchange
     urldata = ''
+    
+    # Initial and current amount of ethereum and bitcoin on the exchange
+    start_eth, eth = 0, 0
+    start_btc, btc = 0, 0
+    
+    # Amount of ethereum, bitcoin on an exchange after the deal adjusted to take into account the order book values
+    adj_eth = 0
+    adj_btc = 0
+    
+    # Price and amount of crypto when bought/sold
+    buy_price = 0
+    sell_price = 0
+    buy_amount = 0
+    sell_amount = 0
+    
+    # Required minimum profit to make the deal profitable
+    min_profit = 0
 
-    jsonBuy = 0
-    jsonSell = 0
-
-    startEth, eth = 0, 0
-    startBtc, btc = 0, 0
-
-    ethOld = 0
-    btcOld = 0
-    adjEth = 0
-    adjBtc = 0
-
-    buyPrice = 0
-    sellPrice = 0
-    buyAmount = 0
-    sellAmount = 0
-
-    minProfit = 0
-
-    orderID = 777777
+    # Assigning some number to order_ID
+    order_id = 777777
 
 
-    def __init__(self, exName):
-        self.__name = exName
-        self.name = exName
+    def __init__(self, ex_name):
+        self.__name = ex_name
+        self.name = ex_name
 
     def sell(self):
         pass
@@ -53,367 +59,313 @@ class Exchange:
     def buy(self):
         pass
 
-    def refreshPricePolo(self):
+    # Refreshing buy/sell price for various exchanges by loading order book information
+
+    def refresh_price_polo(self):
         urldata = 'https://poloniex.com/public?command=returnOrderBook&currencyPair=BTC_ETH&depth=30'
         s = requests.Session()
         try:
             r = s.get(urldata, timeout=5)
             text = r.text
-            theJSON = json.loads(text)
-            self.buyPrice = float(theJSON['asks'][0][0])
-            self.buyAmount = float(theJSON['asks'][0][1])
-            self.sellPrice = float(theJSON['bids'][0][0])
-            self.sellAmount = float(theJSON['bids'][0][1])
+            the_json = json.loads(text)
+            self.buy_price = float(the_json['asks'][0][0])
+            self.buy_amount = float(the_json['asks'][0][1])
+            self.sell_price = float(the_json['bids'][0][0])
+            self.sell_amount = float(the_json['bids'][0][1])
         finally:
             s.close()
 
-    def refreshPriceBtce(self):
+    def refresh_price_btce(self):
         urldata = 'https://btc-e.com/api/3/depth/eth_btc'
         s = requests.Session()
         try:
             r = s.get(urldata, timeout=5)
             text = r.text
-            theJSON = json.loads(text)
-            self.sellPrice = float(theJSON['eth_btc']['bids'][0][0])
-            self.sellAmount = float(theJSON['eth_btc']['bids'][0][1])
-            self.buyPrice = float(theJSON['eth_btc']['asks'][0][0])
-            self.buyAmount = float(theJSON['eth_btc']['asks'][0][1])
+            the_json = json.loads(text)
+            self.sell_price = float(the_json['eth_btc']['bids'][0][0])
+            self.sell_amount = float(the_json['eth_btc']['bids'][0][1])
+            self.buy_price = float(the_json['eth_btc']['asks'][0][0])
+            self.buy_amount = float(the_json['eth_btc']['asks'][0][1])
         finally:
             s.close()
 
+    def refresh_price_kraken(self):
+        the_json = krakenAPI.krak.query_public('Depth', {'pair': 'XETHXXBT', 'count': 5})
+        self.buy_price = float(the_json['result']['XETHXXBT']['asks'][0][0])
+        self.buy_amount = float(the_json['result']['XETHXXBT']['asks'][0][1])
+        self.sell_price = float(the_json['result']['XETHXXBT']['bids'][0][0])
+        self.sell_amount = float(the_json['result']['XETHXXBT']['bids'][0][1])
 
-    def refreshPriceKraken(self):
-        theJSON = krakenAPI.krak.query_public('Depth', {'pair': 'XETHXXBT', 'count': 5})
-        self.buyPrice = float(theJSON['result']['XETHXXBT']['asks'][0][0])
-        self.buyAmount = float(theJSON['result']['XETHXXBT']['asks'][0][1])
-        self.sellPrice = float(theJSON['result']['XETHXXBT']['bids'][0][0])
-        self.sellAmount = float(theJSON['result']['XETHXXBT']['bids'][0][1])
-
-
-
-
-    def refreshPriceGdax(self):
+    def refresh_price_gdax(self):
         urldata = 'https://api.gdax.com/products/ETH-BTC/book?level=1'
         s = requests.Session()
         try:
             r = s.get(urldata, timeout=5)
             text = r.text
-            theJSON = json.loads(text)
-            self.sellPrice = float(theJSON['bids'][0][0])
-            self.sellAmount = float(theJSON['bids'][0][1])
-            self.buyPrice = float(theJSON['asks'][0][0])
-            self.buyAmount = float(theJSON['asks'][0][1])
+            the_json = json.loads(text)
+            self.sell_price = float(the_json['bids'][0][0])
+            self.sell_amount = float(the_json['bids'][0][1])
+            self.buy_price = float(the_json['asks'][0][0])
+            self.buy_amount = float(the_json['asks'][0][1])
         finally:
             s.close()
 
+    # Buy/sell methods for various exchanges
 
-    def sellPolo(self, rate, amount):
+    def sell_polo(self, rate, amount):
         return poloniexAPI.polo.sell('BTC_ETH', rate, amount)
 
-    def buyPolo(self, rate, amount):
+    def buy_polo(self, rate, amount):
         return poloniexAPI.polo.buy('BTC_ETH', rate, amount)
 
-    def sellBtce(self, rate, amount):
+    def sell_btce(self, rate, amount):
         p = str(rate)
         rate = float(p[0:7])
         p = str(amount)
         amount = float(p[0:7])
         return btceAPI.btce.Trade('eth_btc', 'sell', rate, amount)
 
-    def buyBtce(self, rate, amount):
+    def buy_btce(self, rate, amount):
         p = str(rate)
         rate = float(p[0:7])
         p = str(amount)
         amount = float(p[0:7])
         return btceAPI.btce.Trade('eth_btc', 'buy', rate, amount)
 
-    def sellKraken(self, rate, amount):
+    def sell_kraken(self, rate, amount):
         return krakenAPI.krak.PlaceOrder('XETHXXBT', 'sell', rate, amount)
 
-    def buyKraken(self, rate, amount):
+    def buy_kraken(self, rate, amount):
         return krakenAPI.krak.PlaceOrder('XETHXXBT', 'buy', rate, amount)
 
-    def sellGdax(self, rate, amount):
+    def sell_gdax(self, rate, amount):
         p = str(rate)
         rate = float(p[0:7])
         p = str(amount)
         amount = float(p[0:8])
         return gdaxAPI.gdax.sell(rate, amount)
 
-    def buyGdax(self, rate, amount):
+    def buy_gdax(self, rate, amount):
         p = str(rate)
         rate = float(p[0:7])
         p = str(amount)
         amount = float(p[0:8])
         return gdaxAPI.gdax.buy(rate, amount)
+    
+    # Refreshing balances for various exchanges
 
-    def refreshBalancesBtce(self):
+    def refresh_balances_btce(self):
         balance = btceAPI.btce.getInfo()
         self.eth = round(float(balance['return']['funds']['eth']) - 0.00001, 5)
         self.btc = round(float(balance['return']['funds']['btc']) - 0.00001, 5)
 
-    def refreshBalancesPolo(self):
-        balance = poloniexAPI.polo.returnBalances()
+    def refresh_balances_polo(self):
+        balance = poloniexAPI.polo.return_balances()
         self.eth = round(float(balance['ETH']) - 0.00001, 5)
         self.btc = round(float(balance['BTC']) - 0.00001, 5)
 
-    """
-    def addBalancesKraken(self, action):
-        if action == 'balance':
-            balance = krak.query_private('Balance')
-            print(balance)
-            print(krak.key)
-            print(krak.secret)
-            self.eth = float(balance['result']['XETH']) - 0.00001
-            self.btc = float(balance['result']['XXBT']) - 0.00001
-        if action == 'openOrders':
-            pass
-            #self.openOrders = krak.query_private('OpenOrders')
-
-    def refreshBalancesKraken(self):
-        thread1 = Thread(target=self.addBalancesKraken, args=('balance',))
-        thread2 = Thread(target=self.addBalancesKraken, args=('openOrders',))
-        thread1.start()
-        thread2.start()
-        thread1.join()
-        thread2.join()
-
-        dict = self.openOrders
-
-        adjBtc = 0
-        adjEth = 0
-        dict = dict['result']['open']
-        for key in dict:
-            if dict[key]['descr']['type'] == 'buy':
-                adjBtc = adjBtc + float(dict[key]['vol']) * float(dict[key]['descr']['price'])
-            if dict[key]['descr']['type'] == 'sell':
-                adjEth = adjEth + float(dict[key]['vol'])
-
-        self.eth = self.eth - adjEth
-        self.btc = self.btc - adjBtc
-
-    """
-    def refreshBalancesKraken(self):
+    def refresh_balances_kraken(self):
         balance = krakenAPI.krak.query_private('Balance')
         self.eth = float(balance['result']['XETH']) - 0.00001
         self.btc = float(balance['result']['XXBT']) - 0.00001
 
-        dict = krakenAPI.krak.query_private('OpenOrders')
+        dict = krakenAPI.krak.query_private('open_orders')
 
-        adjBtc = 0
-        adjEth = 0
+        adj_btc = 0
+        adj_eth = 0
         dict = dict['result']['open']
         for key in dict:
             if dict[key]['descr']['type'] == 'buy':
-                adjBtc = adjBtc + float(dict[key]['vol']) * float(dict[key]['descr']['price'])
+                adj_btc = adj_btc + float(dict[key]['vol']) * float(dict[key]['descr']['price'])
             if dict[key]['descr']['type'] == 'sell':
-                adjEth = adjEth + float(dict[key]['vol'])
+                adj_eth = adj_eth + float(dict[key]['vol'])
 
-        self.eth = self.eth - adjEth
-        self.btc = self.btc - adjBtc
+        self.eth = self.eth - adj_eth
+        self.btc = self.btc - adj_btc
 
-    def refreshBalancesGdax(self):
-        balance = gdaxAPI.gdax.getAccounts()
+    def refresh_balances_gdax(self):
+        balance = gdaxAPI.gdax.get_accounts()
         for account in balance:
             if account['currency'] == 'BTC':
                 self.btc = round(float(account['available']) - 0.00001, 5)
             if account['currency'] == 'ETH':
                 self.eth = round(float(account['available']) - 0.00001, 5)
+    
+    # Method to check if the deal was successful for various exchanges 
 
-    def succesfulDealBtce(self, dealDetails):
-        if 'return' in dealDetails:
-            self.orderID = dealDetails['return']['order_id']
-            if 'success' in dealDetails:
-                if dealDetails['success'] != 0:
+    def succesful_deal_btce(self, deal_details):
+        if 'return' in deal_details:
+            self.order_id = deal_details['return']['order_id']
+            if 'success' in deal_details:
+                if deal_details['success'] != 0:
                     return True
         return False
 
-    def succesfulDealPoloniex(self, dealDetails):
-        if 'orderNumber' in dealDetails:
-            self.orderID = dealDetails['orderNumber']
-            if 'error' not in dealDetails:
+    def succesful_deal_poloniex(self, deal_details):
+        if 'orderNumber' in deal_details:
+            self.order_id = deal_details['orderNumber']
+            if 'error' not in deal_details:
                 return True
         return False
 
 
-    def succesfulDealGdax(self, dealDetails):
-        if 'id' in dealDetails:
-            self.orderID = dealDetails['id']
+    def succesful_deal_gdax(self, deal_details):
+        if 'id' in deal_details:
+            self.order_id = deal_details['id']
             return True
         return False
+    
+    # Example:
+    # {'result': {'descr': {'order': 'buy 0.10000000 ETHXBT @ limit 0.010000'}, 'txid': ['OHBEGS-YHFZZ-O5W2JS']}, 'error': []}
 
-# {'result': {'descr': {'order': 'buy 0.10000000 ETHXBT @ limit 0.010000'}, 'txid': ['OHBEGS-YHFZZ-O5W2JS']}, 'error': []}
-
-    def succesfulDealKraken(self, dealDetails):
-        if 'result' in dealDetails:
-            if 'txid' in dealDetails['result']:
-                self.orderID = dealDetails['result']['txid'][0]
-            if dealDetails['error'] == []:
+    def succesful_deal_kraken(self, deal_details):
+        if 'result' in deal_details:
+            if 'txid' in deal_details['result']:
+                self.order_id = deal_details['result']['txid'][0]
+            if deal_details['error'] == []:
                 return True
         return False
 
-    def completedDealPoloniex(self, dealDetails):
-        if 'resultingTrades' in dealDetails:
-            if dealDetails['resultingTrades'] == []:
+    def completed_deal_poloniex(self, deal_details):
+        if 'resultingTrades' in deal_details:
+            if deal_details['resultingTrades'] == []:
                 return False
             else:
                 return True
 
-    def completedDealBtce(self, dealDetails):
-        if 'return' in dealDetails:
-            if 'order_id' in dealDetails['return']:
-                if dealDetails['return']['order_id'] == 0:
+    def completed_deal_btce(self, deal_details):
+        if 'return' in deal_details:
+            if 'order_id' in deal_details['return']:
+                if deal_details['return']['order_id'] == 0:
                     return True
                 else:
                     return False
 
 
-    def completedDealKraken(self, dealDetails):
+    def completed_deal_kraken(self, deal_details):
         return True
 
-    def completedDealGdax(self, dealDetails):
+    def completed_deal_gdax(self, deal_details):
         return True
 
-    def openOrdersPoloniex(self):
-        self.hangingOrders = poloniexAPI.polo.returnOpenOrders('BTC_ETH')
+    def open_orders_poloniex(self):
+        self.hanging_orders = poloniexAPI.polo.returnopen_orders('BTC_ETH')
 
-    def openOrdersBtce(self):
-        self.hangingOrders = btceAPI.btce.ActiveOrders('eth_btc')
+    def open_orders_btce(self):
+        self.hanging_orders = btceAPI.btce.active_orders('eth_btc')
 
-    def openOrdersKraken(self):
-        self.hangingOrders = krakenAPI.krak.GetOpenOrders()
+    def open_orders_kraken(self):
+        self.hanging_orders = krakenAPI.krak.get_open_orders()
 
-    def openOrdersGdax(self):
-        self.hangingOrders = gdaxAPI.gdax.getOrders()
+    def open_orders_gdax(self):
+        self.hanging_orders = gdaxAPI.gdax.get_orders()
 
-    def cancelOrderPoloniex(self, orderID):
-        self.cancelDetails = poloniexAPI.polo.cancel('BTC_ETH', orderID)
+    def cancel_order_poloniex(self, order_id):
+        self.cancel_details = poloniexAPI.polo.cancel('BTC_ETH', order_id)
 
-    def cancelOrderBtce(self, orderID):
-        self.cancelDetail = btceAPI.btce.CancelOrder(orderID)
+    def cancel_order_btce(self, order_id):
+        self.cancel_detail = btceAPI.btce.cancel_order(order_id)
 
-    def cancelOrderKraken(self, orderID):
-        self.cancelDetail = krakenAPI.krak.CancelOrder(orderID)
+    def cancel_order_kraken(self, order_id):
+        self.cancel_detail = krakenAPI.krak.cancel_order(order_id)
 
-    def cancelOrderGdax(self, orderID):
-        self.cancelDetail = gdaxAPI.gdax.cancelOrder(orderID)
-
-
+    def cancel_order_gdax(self, order_id):
+        self.cancel_detail = gdaxAPI.gdax.cancel_order(order_id)
 
 
-
+# Initializing each exchange as an object
 Poloniex = Exchange('POLONIEX')
 Btce = Exchange('BTC-E')
 Kraken = Exchange('KRAKEN')
 Gdax = Exchange('GDAX')
 
-#Gdax.loadingBook.append({'x':2})
-#print(Poloniex.loadingBook)
+Poloniex.hanging_orders = []
+Btce.hanging_orders = []
+Kraken.hanging_orders = []
+Gdax.hanging_orders = []
 
-Poloniex.hangingOrders = []
-Btce.hangingOrders = []
-Kraken.hangingOrders = []
-Gdax.hangingOrders = []
+# Redefining names for all methods to unify call methods
+Poloniex.refresh_balances = Poloniex.refresh_balances_polo
+Btce.refresh_balances = Btce.refresh_balances_btce
+Kraken.refresh_balances = Kraken.refresh_balances_kraken
+Gdax.refresh_balances = Gdax.refresh_balances_gdax
 
-Poloniex.refreshBalances = Poloniex.refreshBalancesPolo
-Btce.refreshBalances = Btce.refreshBalancesBtce
-Kraken.refreshBalances = Kraken.refreshBalancesKraken
-Gdax.refreshBalances = Gdax.refreshBalancesGdax
+Poloniex.refresh_price = Poloniex.refresh_price_polo
+Btce.refresh_price = Btce.refresh_price_btce
+Kraken.refresh_price = Kraken.refresh_price_kraken
+Gdax.refresh_price = Gdax.refresh_price_gdax
 
-Poloniex.refreshPrice = Poloniex.refreshPricePolo
-Btce.refreshPrice = Btce.refreshPriceBtce
-Kraken.refreshPrice = Kraken.refreshPriceKraken
-Gdax.refreshPrice = Gdax.refreshPriceGdax
-
-Poloniex.buyFunction = Poloniex.buyPolo
-Poloniex.sellFunction = Poloniex.sellPolo
-Btce.buyFunction = Btce.buyBtce
-Btce.sellFunction = Btce.sellBtce
-Kraken.buyFunction = Kraken.buyKraken
-Kraken.sellFunction = Kraken.sellKraken
-Gdax.buyFunction = Gdax.buyGdax
-Gdax.sellFunction = Gdax.sellGdax
+Poloniex.buy_function = Poloniex.buy_polo
+Poloniex.sell_function = Poloniex.sell_polo
+Btce.buy_function = Btce.buy_btce
+Btce.sell_function = Btce.sell_btce
+Kraken.buy_function = Kraken.buy_kraken
+Kraken.sell_function = Kraken.sell_kraken
+Gdax.buy_function = Gdax.buy_gdax
+Gdax.sell_function = Gdax.sell_gdax
 
 
-Poloniex.completedDeal = Poloniex.completedDealPoloniex
-Btce.completedDeal = Btce.completedDealBtce
-Kraken.completedDeal = Kraken.completedDealKraken
-Gdax.completedDeal = Gdax.completedDealGdax
+Poloniex.completed_deal = Poloniex.completed_deal_poloniex
+Btce.completed_deal = Btce.completed_deal_btce
+Kraken.completed_deal = Kraken.completed_deal_kraken
+Gdax.completed_deal = Gdax.completed_deal_gdax
 
 
-Poloniex.succesfulDeal = Poloniex.succesfulDealPoloniex
-Btce.succesfulDeal = Btce.succesfulDealBtce
-Kraken.succesfulDeal = Kraken.succesfulDealKraken
-Gdax.succesfulDeal = Gdax.succesfulDealGdax
+Poloniex.succesful_deal = Poloniex.succesful_deal_poloniex
+Btce.succesful_deal = Btce.succesful_deal_btce
+Kraken.succesful_deal = Kraken.succesful_deal_kraken
+Gdax.succesful_deal = Gdax.succesful_deal_gdax
 
-Poloniex.openOrders = Poloniex.openOrdersPoloniex
-Btce.openOrders = Btce.openOrdersBtce
-Kraken.openOrders = Kraken.openOrdersKraken
-Gdax.openOrders = Gdax.openOrdersGdax
+Poloniex.open_orders = Poloniex.open_orders_poloniex
+Btce.open_orders = Btce.open_orders_btce
+Kraken.open_orders = Kraken.open_orders_kraken
+Gdax.open_orders = Gdax.open_orders_gdax
 
-Poloniex.cancelOrder = Poloniex.cancelOrderPoloniex
-Btce.cancelOrder = Btce.cancelOrderBtce
-Kraken.cancelOrder = Kraken.cancelOrderKraken
-Gdax.cancelOrder = Gdax.cancelOrderGdax
+Poloniex.cancel_order = Poloniex.cancel_order_poloniex
+Btce.cancel_order = Btce.cancel_order_btce
+Kraken.cancel_order = Kraken.cancel_order_kraken
+Gdax.cancel_order = Gdax.cancel_order_gdax
 
-
+# Maker fee on the exchanges
 Poloniex.fee = 0.0025
 Btce.fee = 0.002
 Kraken.fee = 0.0026
 Gdax.fee = 0.003
 
-Poloniex.power = 0.001
-Btce.power = 0
-Kraken.power = 0.001
-Gdax.power = 0.003
-
-
+# Modifier to account for rounding balances by exchanges
 Poloniex.add = 0.000002
 Btce.add = 0
 Kraken.add = 0.000002
 Gdax.add = 0
 
-exchangeList = [Poloniex, Btce, Gdax, Kraken]
+exchange_list = [Poloniex, Btce, Gdax, Kraken]
 
-def GetAllHangingOrders():
-    for exchange in exchangeList:
-        exchange.openOrders()
-        #print(exchange.name)
-        #print(exchange.hangingOrders)
+def get_all_hanging_orders():
+    for exchange in exchange_list:
+        exchange.open_orders()
 
+tuple_list = []
 
-
-#exchangeList = [Poloniex, Gdax]
-tupleList = []
-
-def makePairs(exchangeList):
-    global tupleList
+def make_pairs(exchange_list):
+    global tuple_list
     i = 0
     b = 0
-    while i < len(exchangeList)-1:
-        while b < len(exchangeList)-1:
-            k = [exchangeList[i], exchangeList[b+1]]
-            t = [exchangeList[b+1], exchangeList[i]]
-            if k in tupleList or t in tupleList:
+    # Finding all possible combos of exchanges to arbitrage and saving in a list of tuples
+    while i < len(exchange_list)-1:
+        while b < len(exchange_list)-1:
+            k = [exchange_list[i], exchange_list[b+1]]
+            t = [exchange_list[b+1], exchange_list[i]]
+            if k in tuple_list or t in tuple_list:
                 pass
             else:
-                if exchangeList[i] == exchangeList[b+1]:
+                if exchange_list[i] == exchange_list[b+1]:
                     pass
                 else:
-                    tupleList.append(k)
-                    tupleList.append(t)
+                    tuple_list.append(k)
+                    tuple_list.append(t)
             b += 1
         b = 0
         i += 1
-    return tupleList
+    return tuple_list
 
-tupleList = makePairs(exchangeList)
-
-#GetAllHangingOrders()
-
-#for exchange in exchangeList:
-#    for order in exchange.hangingOrders:
-#        print(exchange.name)
-#        print(str(order))
-
-
+tuple_list = make_pairs(exchange_list)
