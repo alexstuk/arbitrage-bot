@@ -1,2 +1,3 @@
 # arbitrage-bot
-Trading bot buys and sells crypto on various exchanges using arbitrage
+This trading bot profits by using arbitrage. It buys and sells ethereum and bitcoin on various exchanges.
+
