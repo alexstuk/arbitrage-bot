@@ -3,14 +3,15 @@ import urllib.request, urllib.error, urllib.parse
 import json
 import time
 import hmac, hashlib
-#C:\Users\Loki-2\Anaconda3\Tools\scripts\2to3.py -w poloniexAPI-2.py
 
-def createTimeStamp(datestr, format="%Y-%m-%d %H:%M:%S"):
+
+def create_time_stamp(datestr, format="%Y-%m-%d %H:%M:%S"):
     return time.mktime(time.strptime(datestr, format))
 
 
 class poloniex:
     def __init__(self, APIKey, Secret):
+        # Create an object with authentication information.
         self.APIKey = APIKey
         self.Secret = Secret
 
@@ -23,23 +24,24 @@ class poloniex:
                 for x in range(0, len(after['return'])):
                     if (isinstance(after['return'][x], dict)):
                         if ('datetime' in after['return'][x] and 'timestamp' not in after['return'][x]):
-                            after['return'][x]['timestamp'] = float(createTimeStamp(after['return'][x]['datetime']))
+                            after['return'][x]['timestamp'] = float(create_time_stamp(after['return'][x]['datetime']))
 
         return after
 
     def api_query(self, command, req={}):
+        # Processing various API calls
 
-        if (command == "returnTicker" or command == "return24Volume"):
+        if (command == "return_ticker" or command == "return24Volume"):
             ret = urllib.request.urlopen(urllib.request.Request('https://poloniex.com/public?command=' + command))
             return json.loads(ret.read())
-        elif (command == "returnOrderBook"):
+        elif (command == "return_order_book"):
             ret = urllib.request.urlopen(urllib.request.Request(
-                'http://poloniex.com/public?command=' + command + '&currencyPair=' + str(req['currencyPair'])))
+                'http://poloniex.com/public?command=' + command + '&currency_pair=' + str(req['currency_pair'])))
             return json.loads(ret.read())
-        elif (command == "returnMarketTradeHistory"):
+        elif (command == "return_market_trade_history"):
             ret = urllib.request.urlopen(urllib.request.Request(
-                'http://poloniex.com/public?command=' + "returnTradeHistory" + '&currencyPair=' + str(
-                    req['currencyPair'])))
+                'http://poloniex.com/public?command=' + "return_trade_history" + '&currency_pair=' + str(
+                    req['currency_pair'])))
             return json.loads(ret.read())
         else:
             req['command'] = command
@@ -58,76 +60,81 @@ class poloniex:
             jsonRet = json.loads(text)
             return self.post_process(jsonRet)
 
-    def returnTicker(self):
-        return self.api_query("returnTicker")
+    def return_ticker(self):
+        # API call to get ticker
+        return self.api_query("return_ticker")
 
     def return24Volume(self):
+        # API call to get 24h volume
         return self.api_query("return24Volume")
 
-    def returnOrderBook(self, currencyPair):
-        return self.api_query("returnOrderBook", {'currencyPair': currencyPair})
+    def return_order_book(self, currency_pair):
+        # API call to get order book
+        return self.api_query("return_order_book", {'currency_pair': currency_pair})
 
-    def returnMarketTradeHistory(self, currencyPair):
-        return self.api_query("returnMarketTradeHistory", {'currencyPair': currencyPair})
+    def return_market_trade_history(self, currency_pair):
+        # API call to get trade history
+        return self.api_query("return_market_trade_history", {'currency_pair': currency_pair})
 
     # Returns all of your balances.
     # Outputs:
     # {"BTC":"0.59098578","LTC":"3.31117268", ... }
-    def returnBalances(self):
-        return self.api_query('returnBalances')
+    def return_balances(self):
+        # API call to get balances
+        return self.api_query('return_balances')
 
-    # Returns your open orders for a given market, specified by the "currencyPair" POST parameter, e.g. "BTC_XCP"
+    # Returns your open orders for a given market, specified by the "currency_pair" POST parameter, e.g. "BTC_XCP"
     # Inputs:
-    # currencyPair  The currency pair e.g. "BTC_XCP"
+    # currency_pair  The currency pair e.g. "BTC_XCP"
     # Outputs:
-    # orderNumber   The order number
+    # order_number   The order number
     # type          sell or buy
     # rate          Price the order is selling or buying at
     # Amount        Quantity of order
     # total         Total value of order (price * quantity)
-    def returnOpenOrders(self, currencyPair):
-        return self.api_query('returnOpenOrders', {"currencyPair": currencyPair})
+    def return_open_orders(self, currency_pair):
+        return self.api_query('return_open_orders', {"currency_pair": currency_pair})
 
-    # Returns your trade history for a given market, specified by the "currencyPair" POST parameter
+    # Returns your trade history for a given market, specified by the "currency_pair" POST parameter
     # Inputs:
-    # currencyPair  The currency pair e.g. "BTC_XCP"
+    # currency_pair  The currency pair e.g. "BTC_XCP"
     # Outputs:
     # date          Date in the form: "2014-02-19 03:44:59"
     # rate          Price the order is selling or buying at
     # amount        Quantity of order
     # total         Total value of order (price * quantity)
     # type          sell or buy
-    def returnTradeHistory(self, currencyPair):
-        return self.api_query('returnTradeHistory', {"currencyPair": currencyPair})
+    def return_trade_history(self, currency_pair):
+        return self.api_query('return_trade_history', {"currency_pair": currency_pair})
 
-    # Places a buy order in a given market. Required POST parameters are "currencyPair", "rate", and "amount". If successful, the method will return the order number.
+    # Places a buy order in a given market. Required POST parameters are "currency_pair", "rate", and "amount". If successful, the method will return the order number.
     # Inputs:
-    # currencyPair  The curreny pair
+    # currency_pair  The curreny pair
     # rate          price the order is buying at
     # amount        Amount of coins to buy
     # Outputs:
-    # orderNumber   The order number
-    def buy(self, currencyPair, rate, amount):
-        return self.api_query('buy', {"currencyPair": currencyPair, "rate": rate, "amount": amount})
+    # order_number   The order number
+    def buy(self, currency_pair, rate, amount):
+        return self.api_query('buy', {"currency_pair": currency_pair, "rate": rate, "amount": amount})
 
-    # Places a sell order in a given market. Required POST parameters are "currencyPair", "rate", and "amount". If successful, the method will return the order number.
+    # Places a sell order in a given market. Required POST parameters are "currency_pair", "rate", and "amount". If successful, the method will return the order number.
     # Inputs:
-    # currencyPair  The curreny pair
+    # currency_pair  The curreny pair
     # rate          price the order is selling at
     # amount        Amount of coins to sell
     # Outputs:
-    # orderNumber   The order number
-    def sell(self, currencyPair, rate, amount):
-        return self.api_query('sell', {"currencyPair": currencyPair, "rate": rate, "amount": amount})
+    # order_number   The order number
+    def sell(self, currency_pair, rate, amount):
+        return self.api_query('sell', {"currency_pair": currency_pair, "rate": rate, "amount": amount})
 
-    # Cancels an order you have placed in a given market. Required POST parameters are "currencyPair" and "orderNumber".
+    # Cancels an order you have placed in a given market. Required POST parameters are "currency_pair" and "order_number".
     # Inputs:
-    # currencyPair  The curreny pair
-    # orderNumber   The order number to cancel
+    # currency_pair  The curreny pair
+    # order_number   The order number to cancel
     # Outputs:
     # succes        1 or 0
-    def cancel(self, currencyPair, orderNumber):
-        return self.api_query('cancelOrder', {"currencyPair": currencyPair, "orderNumber": orderNumber})
+    def cancel(self, currency_pair, order_number):
+        return self.api_query('cancelOrder', {"currency_pair": currency_pair, "order_number": order_number})
 
     # Immediately places a withdrawal for a given currency, with no email confirmation. In order to use this method, the withdrawal privilege must be enabled for your API key. Required POST parameters are "currency", "amount", and "address". Sample output: {"response":"Withdrew 2398 NXT."}
     # Inputs:
@@ -143,8 +150,3 @@ APIKey1 = ''
 Secret1 = b''
 
 polo = poloniex(APIKey1.encode(), Secret1)
-#p = polo.buy('BTC_zTH', 1, 0.1)
-#print(polo.returnBalances()['BTC'])
-#print(p)
-#P = polo.cancel('BTC_ETH', '77777777777')
-#print(p)
